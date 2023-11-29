@@ -24,12 +24,26 @@ type server struct {
 
 func (s *server) DoProbes(ctx context.Context, in *pb.ProbeRequest) (*pb.ProbeReply, error) {
 	// TODO: support a number of repetitions and return average latency
-	start := time.Now()
-	_, _ = http.Get(in.GetEndpoint())	// TODO: add error handling here and check the response code
-	elapsed := time.Since(start)
-	elapsedMsecs := float32(elapsed / time.Millisecond)
+	_, err := http.Get(in.GetEndpoint())
+	if err != nil {
+		return &pb.ProbeReply{AvgLatencyMsecs: -1}, err
+	}
 
-	return &pb.ProbeReply{LatencyMsecs: elapsedMsecs}, nil
+	var totalTimeElapsed float32
+	for i := 0; i < int(in.GetNreq()); i++ {
+		start := time.Now()
+		_, _ = http.Get(in.GetEndpoint()) // TODO: add error handling here and check the response code
+		if err != nil {
+			return &pb.ProbeReply{AvgLatencyMsecs: -1}, err
+		}
+		elapsed := time.Since(start)
+		elapsedMsecs := float32(elapsed / time.Millisecond)
+		totalTimeElapsed += elapsedMsecs
+		fmt.Printf("Time for request %d: %f ms\n", i, elapsedMsecs)
+	}
+
+	avgElapsed := totalTimeElapsed / float32(in.Nreq)
+	return &pb.ProbeReply{AvgLatencyMsecs: avgElapsed}, nil
 }
 
 func main() {
